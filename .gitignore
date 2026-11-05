@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+dashboard.html
+.ipynb_checkpoints/
+Kalshi-resolves-investigate.ipynb

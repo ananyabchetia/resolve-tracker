@@ -1,0 +1,67 @@
+name: Kalshi Rules Watch
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kalshi-rules-watch
+  cancel-in-progress: false
+
+jobs:
+  watch-and-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore watcher database
+        uses: actions/cache/restore@v4
+        with:
+          path: kalshi_rules.db
+          key: rules-db-${{ github.run_id }}
+          restore-keys: |
+            rules-db-
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Check markets and generate dashboard
+        run: python kalshi_rules_watch.py
+
+      - name: Save watcher database
+        uses: actions/cache/save@v4
+        with:
+          path: kalshi_rules.db
+          key: rules-db-${{ github.run_id }}
+
+      - name: Prepare Pages content
+        run: |
+          mkdir _site
+          cp dashboard.html _site/index.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
