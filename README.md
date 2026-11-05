@@ -1,7 +1,8 @@
-# Kalshi Rules Watch
+# resolve-tracker
 
-This watcher snapshots the resolution rules for open Kalshi markets, records
-changes in SQLite, and generates a static `dashboard.html`.
+Tracks whether Kalshi markets change their resolution rules at the last minute.
+The watcher snapshots resolution rules for open markets, records changes in
+SQLite, and generates a static `dashboard.html`.
 
 ## GitHub Pages deployment
 
