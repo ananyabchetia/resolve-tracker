@@ -122,6 +122,24 @@ def word_diff_html(old, new):
     return " ".join(out)
 
 
+def before_after_html(old, new):
+    """Full old text and full new text, with removed words marked in the old
+    version and added words marked in the new version."""
+    a, b = old.split(" "), new.split(" ")
+    before, after = [], []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes():
+        old_part, new_part = html.escape(" ".join(a[i1:i2])), html.escape(" ".join(b[j1:j2]))
+        if op == "equal":
+            before.append(old_part)
+            after.append(new_part)
+        else:
+            if old_part:
+                before.append(f"<del>{old_part}</del>")
+            if new_part:
+                after.append(f"<ins>{new_part}</ins>")
+    return " ".join(before) or "<em>(empty)</em>", " ".join(after) or "<em>(empty)</em>"
+
+
 # ---------------------------------------------------------------- storage
 def init_db(conn):
     conn.executescript("""
@@ -216,13 +234,17 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
 
     cards = []
     for (ts, sev, ticker, ev, title, field, sim, reason, old, new) in rows:
+        before, after = before_after_html(old, new)
         cards.append(f"""
         <div class="card {sev.lower()}" data-sev="{sev}">
           <div class="head"><span class="badge">{sev}</span>
             <a href="https://kalshi.com/markets/{html.escape(ev.lower())}" target="_blank">{html.escape(ticker)}</a>
             <span class="muted">{html.escape(field)} · {sim:.0%} similar · {html.escape(reason)} · {ts}</span></div>
           <div class="title">{html.escape(title)}</div>
-          <div class="diff">{word_diff_html(old, new)}</div>
+          <div class="compare">
+            <div class="side before"><div class="label">Previous rule</div>{before}</div>
+            <div class="side after"><div class="label">New rule</div>{after}</div>
+          </div>
         </div>""")
 
     page = f"""<!doctype html><html><head><meta charset="utf-8">
@@ -234,7 +256,12 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
  .stat b{{font-size:1.4em;display:block}} .card{{background:#fff;border:1px solid #ddd;border-left:5px solid #aaa;border-radius:6px;padding:12px;margin:10px 0}}
  .card.major{{border-left-color:#d33}} .badge{{font-size:.75em;font-weight:700;padding:2px 6px;border-radius:4px;background:#eee}}
  .major .badge{{background:#d33;color:#fff}} .head{{display:flex;gap:8px;align-items:center;flex-wrap:wrap}}
- .muted{{color:#777;font-size:.85em}} .title{{margin:6px 0;font-weight:600}} .diff{{line-height:1.5}}
+ .muted{{color:#777;font-size:.85em}} .title{{margin:6px 0;font-weight:600}}
+ .compare{{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}}
+ @media (max-width:700px){{.compare{{grid-template-columns:1fr}}}}
+ .side{{border:1px solid #e3e3e3;border-radius:6px;padding:10px;line-height:1.5;font-size:.93em}}
+ .before{{background:#fff8f8}} .after{{background:#f7fff7}}
+ .label{{font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#777;margin-bottom:4px}}
  del{{background:#fdd;color:#900}} ins{{background:#dfd;color:#060;text-decoration:none}}
  label{{cursor:pointer}} .hide-minor .card[data-sev=MINOR]{{display:none}}
 </style></head><body>
