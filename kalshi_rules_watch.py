@@ -227,18 +227,16 @@ def send_alerts(changes, major_only=True):
 # ---------------------------------------------------------------- dashboard
 def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
     rows = conn.execute("""
-        SELECT detected_at, severity, ticker, event_ticker, title, field, similarity, reason,
-               old_text, new_text
+        SELECT detected_at, severity, title, field, similarity, reason, old_text, new_text
         FROM rules_changes ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
     n_major = sum(1 for r in rows if r[1] == "MAJOR")
 
     cards = []
-    for (ts, sev, ticker, ev, title, field, sim, reason, old, new) in rows:
+    for (ts, sev, title, field, sim, reason, old, new) in rows:
         before, after = before_after_html(old, new)
         cards.append(f"""
         <div class="card {sev.lower()}" data-sev="{sev}">
           <div class="head"><span class="badge">{sev}</span>
-            <a href="https://kalshi.com/markets/{html.escape(ev.lower())}" target="_blank">{html.escape(ticker)}</a>
             <span class="muted">{html.escape(field)} · {sim:.0%} similar · {html.escape(reason)} · {ts}</span></div>
           <div class="title">{html.escape(title)}</div>
           <div class="compare">
