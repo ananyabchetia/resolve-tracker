@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="300"><title>Kalshi Rules Watch</title>
+<style>
+ body{font-family:system-ui,sans-serif;max-width:1000px;margin:24px auto;padding:0 16px;background:#fafafa;color:#222}
+ .stats{display:flex;gap:16px;margin:12px 0 20px} .stat{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 16px}
+ .stat b{font-size:1.4em;display:block} .card{background:#fff;border:1px solid #ddd;border-left:5px solid #aaa;border-radius:6px;padding:12px;margin:10px 0}
+ .card.major{border-left-color:#d33} .badge{font-size:.75em;font-weight:700;padding:2px 6px;border-radius:4px;background:#eee}
+ .major .badge{background:#d33;color:#fff} .head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+ .muted{color:#777;font-size:.85em} .title{margin:6px 0;font-weight:600}
+ .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+ @media (max-width:700px){.compare{grid-template-columns:1fr}}
+ .side{border:1px solid #e3e3e3;border-radius:6px;padding:10px;line-height:1.5;font-size:.93em}
+ .before{background:#fff8f8} .after{background:#f7fff7}
+ .label{font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#777;margin-bottom:4px}
+ del{background:#fdd;color:#900} ins{background:#dfd;color:#060;text-decoration:none}
+ label{cursor:pointer} .hide-minor .card[data-sev=MINOR]{display:none}
+</style></head><body>
+<h1>Kalshi Rules Watch</h1>
+<div class="muted">Last check: 2026-11-09 13:58:03 · auto-refreshes every 5 min</div>
+<div class="stats"><div class="stat"><b>1</b>open markets tracked</div>
+<div class="stat"><b>2</b>changes logged</div><div class="stat"><b>2</b>major</div></div>
+<label><input type="checkbox" onchange="document.body.classList.toggle('hide-minor',this.checked)"> Major only</label>
+
+        <div class="card major" data-sev="MAJOR">
+          <div class="head"><span class="badge">MAJOR</span>
+            <span class="muted">rules_secondary · 53% similar · text 53% similar · 2026-11-09T18:58:03+00:00</span></div>
+          <div class="title">Fed rate above 4.00%?</div>
+          <div class="compare">
+            <div class="side before"><div class="label">Previous rule</div>Source: Federal <del>Reserve.</del></div>
+            <div class="side after"><div class="label">New rule</div>Source: Federal <ins>Reserve press release, or Bloomberg if unavailable.</ins></div>
+          </div>
+        </div>
+        <div class="card major" data-sev="MAJOR">
+          <div class="head"><span class="badge">MAJOR</span>
+            <span class="muted">rules_primary · 98% similar · numbers/dates changed · 2026-11-09T18:58:03+00:00</span></div>
+          <div class="title">Fed rate above 4.00%?</div>
+          <div class="compare">
+            <div class="side before"><div class="label">Previous rule</div>If the upper bound of the federal funds rate is above <del>4.00%</del> on Dec 10, 2026, the market resolves to Yes.</div>
+            <div class="side after"><div class="label">New rule</div>If the upper bound of the federal funds rate is above <ins>4.25%</ins> on Dec 10, 2026, the market resolves to Yes.</div>
+          </div>
+        </div>
+</body></html>
