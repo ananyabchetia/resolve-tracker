@@ -99,6 +99,9 @@ def numbers_in(text):
 
 def classify(old, new, threshold):
     similarity = difflib.SequenceMatcher(None, old, new).ratio()
+    if not old.strip() and new.strip():
+        return "MINOR", similarity, "rule added"
+
     nums_changed = numbers_in(old) != numbers_in(new)
     reasons = []
     if similarity < threshold:
