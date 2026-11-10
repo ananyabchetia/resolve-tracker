@@ -227,18 +227,56 @@ def send_alerts(changes, major_only=True):
 # ---------------------------------------------------------------- dashboard
 def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
     rows = conn.execute("""
-        SELECT detected_at, severity, title, field, similarity, reason, old_text, new_text
+        SELECT detected_at, severity, title, field, similarity, reason, old_text, new_text,
+               event_ticker, ticker
         FROM rules_changes ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
     n_major = sum(1 for r in rows if r[1] == "MAJOR")
 
+    groups = {}
+    for row in rows:
+        ts, sev, title, field, sim, reason, old, new, event_ticker, ticker = row
+        event_key = event_ticker or ticker
+        key = (event_key, field, old, new, sev, reason, ts)
+        if key not in groups:
+            groups[key] = {
+                "ts": ts, "severity": sev, "field": field, "similarity": sim,
+                "reason": reason, "old": old, "new": new, "markets": [],
+                "market_tickers": set(),
+            }
+        if ticker not in groups[key]["market_tickers"]:
+            groups[key]["markets"].append({"title": title, "ticker": ticker})
+            groups[key]["market_tickers"].add(ticker)
+
     cards = []
-    for (ts, sev, title, field, sim, reason, old, new) in rows:
-        before, after = before_after_html(old, new)
+    for group in groups.values():
+        before, after = before_after_html(group["old"], group["new"])
+        markets = group["markets"]
+        first_market = markets[0]
+        market_link = (
+            f'<a class="market-link" href="https://kalshi.com/markets/" target="_blank">'
+            f'{html.escape(first_market["ticker"] or "")}</a>'
+        )
+        if len(markets) > 1:
+            options = "".join(
+                f'<option value="{i}" data-title="{html.escape(market["title"] or "", quote=True)}" '
+                f'data-ticker="{html.escape(market["ticker"] or "", quote=True)}">'
+                f'{html.escape(market["title"] or market["ticker"] or "Untitled market")} '
+                f'({html.escape(market["ticker"] or "")})</option>'
+                for i, market in enumerate(markets)
+            )
+            market_picker = (
+                '<div class="market-picker"><label>Markets in this event '
+                f'<select class="market-select" aria-label="Select a market">{options}</select></label></div>'
+            )
+        else:
+            market_picker = ""
         cards.append(f"""
-        <div class="card {sev.lower()}" data-sev="{sev}">
-          <div class="head"><span class="badge">{sev}</span>
-            <span class="muted">{html.escape(field)} · {sim:.0%} similar · {html.escape(reason)} · {ts}</span></div>
-          <div class="title">{html.escape(title)}</div>
+        <div class="card {group["severity"].lower()}" data-sev="{group["severity"]}">
+          <div class="head"><span class="badge">{group["severity"]}</span>
+            {market_link}
+            <span class="muted">{html.escape(group["field"])} · {group["similarity"]:.0%} similar · {html.escape(group["reason"])} · {group["ts"]}</span></div>
+          {market_picker}
+          <div class="title">{html.escape(first_market["title"] or "")}</div>
           <div class="compare">
             <div class="side before"><div class="label">Previous rule</div>{before}</div>
             <div class="side after"><div class="label">New rule</div>{after}</div>
@@ -261,7 +299,8 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
  .before{{background:#fff8f8}} .after{{background:#f7fff7}}
  .label{{font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#777;margin-bottom:4px}}
  del{{background:#fdd;color:#900}} ins{{background:#dfd;color:#060;text-decoration:none}}
- label{{cursor:pointer}} .hide-minor .card[data-sev=MINOR]{{display:none}}
+ label{{cursor:pointer}} .market-picker{{margin-top:8px}} .market-picker select{{max-width:100%;padding:5px}}
+ .hide-minor .card[data-sev=MINOR]{{display:none}}
 </style></head><body>
 <h1>Kalshi Rules Watch</h1>
 <div class="muted">Last check: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} · auto-refreshes every 5 min</div>
@@ -269,6 +308,17 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
 <div class="stat"><b>{len(rows)}</b>changes logged</div><div class="stat"><b>{n_major}</b>major</div></div>
 <label><input type="checkbox" onchange="document.body.classList.toggle('hide-minor',this.checked)"> Major only</label>
 {''.join(cards) or '<p>No rule changes detected yet.</p>'}
+<script>
+document.querySelectorAll(".market-select").forEach(select => {{
+  select.addEventListener("change", () => {{
+    const option = select.selectedOptions[0];
+    const card = select.closest(".card");
+    card.querySelector(".title").textContent = option.dataset.title;
+    const link = card.querySelector(".market-link");
+    link.textContent = option.dataset.ticker;
+  }});
+}});
+</script>
 </body></html>"""
     with open(path, "w", encoding="utf-8") as f:
         f.write(page)
