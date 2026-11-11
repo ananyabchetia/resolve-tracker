@@ -257,10 +257,7 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
         markets = group["markets"]
         first_market = markets[0]
         before, after = before_after_html(first_market["old"], first_market["new"])
-        market_link = (
-            f'<a class="market-link" href="https://kalshi.com/markets/" target="_blank">'
-            f'{html.escape(first_market["ticker"] or "")}</a>'
-        )
+        market_ticker = f'<span class="market-ticker">{html.escape(first_market["ticker"] or "")}</span>'
         if len(markets) > 1:
             option_items = []
             for i, market in enumerate(markets):
@@ -287,7 +284,7 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
         cards.append(f"""
         <div class="card {group["severity"].lower()}" data-sev="{group["severity"]}">
           <div class="head"><span class="badge">{group["severity"]}</span>
-            {market_link}
+            {market_ticker}
             <span class="muted change-meta">{html.escape(group["field"])} · {first_market["similarity"]:.0%} similar · {html.escape(first_market["reason"])} · {group["ts"]}</span></div>
           {market_picker}
           <div class="title">{html.escape(first_market["title"] or "")}</div>
@@ -328,7 +325,7 @@ document.querySelectorAll(".market-select").forEach(select => {{
     const option = select.selectedOptions[0];
     const card = select.closest(".card");
     card.querySelector(".title").textContent = option.dataset.title;
-    card.querySelector(".market-link").textContent = option.dataset.ticker;
+    card.querySelector(".market-ticker").textContent = option.dataset.ticker;
     card.querySelector(".change-meta").textContent =
       `${{option.dataset.field}} · ${{option.dataset.similarity}} similar · ${{option.dataset.reason}} · ${{option.dataset.timestamp}}`;
     card.querySelector(".before .rule-text").innerHTML = option.dataset.before;
