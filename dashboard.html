@@ -14,13 +14,21 @@
  .before{background:#fff8f8} .after{background:#f7fff7}
  .label{font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#777;margin-bottom:4px}
  del{background:#fdd;color:#900} ins{background:#dfd;color:#060;text-decoration:none}
- label{cursor:pointer} .hide-minor .card[data-sev=MINOR]{display:none}
+ label{cursor:pointer} .dashboard-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0}
+ .dashboard-controls input[type=search]{flex:1;min-width:220px;padding:8px;border:1px solid #ccc;border-radius:6px;font:inherit}
+ .pagination{display:flex;gap:12px;align-items:center;justify-content:center;margin:18px 0}
+ .pagination button{padding:7px 12px;border:1px solid #ccc;border-radius:6px;background:#fff;font:inherit;cursor:pointer}
+ .pagination button:disabled{opacity:.45;cursor:default}
 </style></head><body>
 <h1>Kalshi Rules Watch</h1>
 <div class="muted">Last check: 2026-11-09 13:58:03 · auto-refreshes every 5 min</div>
 <div class="stats"><div class="stat"><b>1</b>open markets tracked</div>
 <div class="stat"><b>2</b>changes logged</div><div class="stat"><b>2</b>major</div></div>
-<label><input type="checkbox" onchange="document.body.classList.toggle('hide-minor',this.checked)"> Major only</label>
+<div class="dashboard-controls">
+  <label><input id="major-only" type="checkbox"> Major only</label>
+  <input id="change-search" type="search" placeholder="Search markets, tickers, or rules" aria-label="Search rule changes">
+</div>
+<div id="change-list">
 
         <div class="card major" data-sev="MAJOR">
           <div class="head"><span class="badge">MAJOR</span>
@@ -42,4 +50,45 @@
             <div class="side after"><div class="label">New rule</div>If the upper bound of the federal funds rate is above <ins>4.25%</ins> on Dec 10, 2026, the market resolves to Yes.</div>
           </div>
         </div>
+</div>
+<nav class="pagination" aria-label="Rule change history pages">
+  <button id="newer-page" type="button" aria-label="Show newer changes">← Newer</button>
+  <span id="page-status" class="muted"></span>
+  <button id="older-page" type="button" aria-label="Show older changes">Older →</button>
+</nav>
+<script>
+const pageSize = 5;
+let currentPage = 0;
+const changeCards = Array.from(document.querySelectorAll("#change-list .card"));
+const searchInput = document.querySelector("#change-search");
+const majorOnly = document.querySelector("#major-only");
+const pageStatus = document.querySelector("#page-status");
+const newerButton = document.querySelector("#newer-page");
+const olderButton = document.querySelector("#older-page");
+
+function updateHistory() {
+  const query = searchInput.value.trim().toLocaleLowerCase();
+  const matchingCards = changeCards.filter(card => {
+    const text = `${card.textContent} ${Array.from(card.querySelectorAll("option"))
+      .map(option => `${option.textContent} ${option.dataset.ticker || ""}`)
+      .join(" ")}`.toLocaleLowerCase();
+    return (!query || text.includes(query)) && (!majorOnly.checked || card.dataset.sev === "MAJOR");
+  });
+  const pageCount = Math.ceil(matchingCards.length / pageSize);
+  currentPage = Math.min(currentPage, Math.max(pageCount - 1, 0));
+  const visibleCards = new Set(matchingCards.slice(currentPage * pageSize, (currentPage + 1) * pageSize));
+  changeCards.forEach(card => { card.hidden = !visibleCards.has(card); });
+  pageStatus.textContent = pageCount
+    ? `Page ${currentPage + 1} of ${pageCount} · ${matchingCards.length} flags`
+    : "No matching flags";
+  newerButton.disabled = currentPage === 0;
+  olderButton.disabled = currentPage >= pageCount - 1;
+}
+
+searchInput.addEventListener("input", () => { currentPage = 0; updateHistory(); });
+majorOnly.addEventListener("change", () => { currentPage = 0; updateHistory(); });
+newerButton.addEventListener("click", () => { currentPage--; updateHistory(); });
+olderButton.addEventListener("click", () => { currentPage++; updateHistory(); });
+updateHistory();
+</script>
 </body></html>

@@ -228,11 +228,11 @@ def send_alerts(changes, major_only=True):
 
 
 # ---------------------------------------------------------------- dashboard
-def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
+def write_dashboard(conn, n_markets, path=DASHBOARD_PATH):
     rows = conn.execute("""
         SELECT detected_at, severity, title, field, similarity, reason, old_text, new_text,
                event_ticker, ticker
-        FROM rules_changes ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
+        FROM rules_changes ORDER BY id DESC""").fetchall()
     n_major = sum(1 for r in rows if r[1] == "MAJOR")
 
     groups = {}
@@ -258,6 +258,12 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
         first_market = markets[0]
         before, after = before_after_html(first_market["old"], first_market["new"])
         market_ticker = f'<span class="market-ticker">{html.escape(first_market["ticker"] or "")}</span>'
+        search_text = " ".join(
+            value
+            for market in markets
+            for value in (market["title"], market["ticker"], market["old"], market["new"])
+            if value
+        )
         if len(markets) > 1:
             option_items = []
             for i, market in enumerate(markets):
@@ -282,7 +288,7 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
         else:
             market_picker = ""
         cards.append(f"""
-        <div class="card {group["severity"].lower()}" data-sev="{group["severity"]}">
+        <div class="card {group["severity"].lower()}" data-sev="{group["severity"]}" data-search="{html.escape(search_text, quote=True)}">
           <div class="head"><span class="badge">{group["severity"]}</span>
             {market_ticker}
             <span class="muted change-meta">{html.escape(group["field"])} · {first_market["similarity"]:.0%} similar · {html.escape(first_market["reason"])} · {group["ts"]}</span></div>
@@ -311,15 +317,62 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
  .label{{font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#777;margin-bottom:4px}}
  del{{background:#fdd;color:#900}} ins{{background:#dfd;color:#060;text-decoration:none}}
  label{{cursor:pointer}} .market-picker{{margin-top:8px}} .market-picker select{{max-width:100%;padding:5px}}
- .hide-minor .card[data-sev=MINOR]{{display:none}}
+ .dashboard-controls{{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0}}
+ .dashboard-controls input[type=search]{{flex:1;min-width:220px;padding:8px;border:1px solid #ccc;border-radius:6px;font:inherit}}
+ .pagination{{display:flex;gap:12px;align-items:center;justify-content:center;margin:18px 0}}
+ .pagination button{{padding:7px 12px;border:1px solid #ccc;border-radius:6px;background:#fff;font:inherit;cursor:pointer}}
+ .pagination button:disabled{{opacity:.45;cursor:default}}
+ .empty-state{{color:#777;padding:16px 0}}
 </style></head><body>
 <h1>Kalshi Rules Watch</h1>
 <div class="muted">Last check: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} · auto-refreshes every 5 min</div>
 <div class="stats"><div class="stat"><b>{n_markets:,}</b>open markets tracked</div>
 <div class="stat"><b>{len(rows)}</b>changes logged</div><div class="stat"><b>{n_major}</b>major</div></div>
-<label><input type="checkbox" onchange="document.body.classList.toggle('hide-minor',this.checked)"> Major only</label>
-{''.join(cards) or '<p>No rule changes detected yet.</p>'}
+<div class="dashboard-controls">
+  <label><input id="major-only" type="checkbox"> Major only</label>
+  <input id="change-search" type="search" placeholder="Search markets, tickers, or rules" aria-label="Search rule changes">
+</div>
+<div id="change-list">{''.join(cards) or '<p class="empty-state">No rule changes detected yet.</p>'}</div>
+<nav class="pagination" aria-label="Rule change history pages">
+  <button id="newer-page" type="button" aria-label="Show newer changes">← Newer</button>
+  <span id="page-status" class="muted"></span>
+  <button id="older-page" type="button" aria-label="Show older changes">Older →</button>
+</nav>
 <script>
+const pageSize = 5;
+let currentPage = 0;
+const changeCards = Array.from(document.querySelectorAll("#change-list .card"));
+const searchInput = document.querySelector("#change-search");
+const majorOnly = document.querySelector("#major-only");
+const pageStatus = document.querySelector("#page-status");
+const newerButton = document.querySelector("#newer-page");
+const olderButton = document.querySelector("#older-page");
+
+function updateHistory() {{
+  const query = searchInput.value.trim().toLocaleLowerCase();
+  const matchingCards = changeCards.filter(card => {{
+    const matchesSearch = !query || card.dataset.search.toLocaleLowerCase().includes(query);
+    const matchesSeverity = !majorOnly.checked || card.dataset.sev === "MAJOR";
+    return matchesSearch && matchesSeverity;
+  }});
+  const pageCount = Math.ceil(matchingCards.length / pageSize);
+  currentPage = Math.min(currentPage, Math.max(pageCount - 1, 0));
+  const visibleCards = new Set(matchingCards.slice(currentPage * pageSize, (currentPage + 1) * pageSize));
+  changeCards.forEach(card => {{
+    card.hidden = !visibleCards.has(card);
+  }});
+  pageStatus.textContent = pageCount
+    ? `Page ${{currentPage + 1}} of ${{pageCount}} · ${{matchingCards.length}} flags`
+    : "No matching flags";
+  newerButton.disabled = currentPage === 0;
+  olderButton.disabled = currentPage >= pageCount - 1;
+}}
+
+searchInput.addEventListener("input", () => {{ currentPage = 0; updateHistory(); }});
+majorOnly.addEventListener("change", () => {{ currentPage = 0; updateHistory(); }});
+newerButton.addEventListener("click", () => {{ currentPage--; updateHistory(); }});
+olderButton.addEventListener("click", () => {{ currentPage++; updateHistory(); }});
+
 document.querySelectorAll(".market-select").forEach(select => {{
   select.addEventListener("change", () => {{
     const option = select.selectedOptions[0];
@@ -332,6 +385,7 @@ document.querySelectorAll(".market-select").forEach(select => {{
     card.querySelector(".after .rule-text").innerHTML = option.dataset.after;
   }});
 }});
+updateHistory();
 </script>
 </body></html>"""
     with open(path, "w", encoding="utf-8") as f:
