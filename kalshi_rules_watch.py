@@ -239,34 +239,45 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
     for row in rows:
         ts, sev, title, field, sim, reason, old, new, event_ticker, ticker = row
         event_key = event_ticker or ticker
-        key = (event_key, field, old, new, sev, reason, ts)
+        key = (event_key, field, sev, ts)
         if key not in groups:
             groups[key] = {
-                "ts": ts, "severity": sev, "field": field, "similarity": sim,
-                "reason": reason, "old": old, "new": new, "markets": [],
+                "ts": ts, "severity": sev, "field": field, "markets": [],
                 "market_tickers": set(),
             }
         if ticker not in groups[key]["market_tickers"]:
-            groups[key]["markets"].append({"title": title, "ticker": ticker})
+            groups[key]["markets"].append({
+                "title": title, "ticker": ticker, "old": old, "new": new,
+                "similarity": sim, "reason": reason,
+            })
             groups[key]["market_tickers"].add(ticker)
 
     cards = []
     for group in groups.values():
-        before, after = before_after_html(group["old"], group["new"])
         markets = group["markets"]
         first_market = markets[0]
+        before, after = before_after_html(first_market["old"], first_market["new"])
         market_link = (
             f'<a class="market-link" href="https://kalshi.com/markets/" target="_blank">'
             f'{html.escape(first_market["ticker"] or "")}</a>'
         )
         if len(markets) > 1:
-            options = "".join(
-                f'<option value="{i}" data-title="{html.escape(market["title"] or "", quote=True)}" '
-                f'data-ticker="{html.escape(market["ticker"] or "", quote=True)}">'
-                f'{html.escape(market["title"] or market["ticker"] or "Untitled market")} '
-                f'({html.escape(market["ticker"] or "")})</option>'
-                for i, market in enumerate(markets)
-            )
+            option_items = []
+            for i, market in enumerate(markets):
+                market_before, market_after = before_after_html(market["old"], market["new"])
+                option_items.append(
+                    f'<option value="{i}" data-title="{html.escape(market["title"] or "", quote=True)}" '
+                    f'data-ticker="{html.escape(market["ticker"] or "", quote=True)}" '
+                    f'data-before="{html.escape(market_before, quote=True)}" '
+                    f'data-after="{html.escape(market_after, quote=True)}" '
+                    f'data-similarity="{market["similarity"]:.0%}" '
+                    f'data-reason="{html.escape(market["reason"] or "", quote=True)}" '
+                    f'data-field="{html.escape(group["field"], quote=True)}" '
+                    f'data-timestamp="{html.escape(group["ts"], quote=True)}">'
+                    f'{html.escape(market["title"] or market["ticker"] or "Untitled market")} '
+                    f'({html.escape(market["ticker"] or "")})</option>'
+                )
+            options = "".join(option_items)
             market_picker = (
                 '<div class="market-picker"><label>Markets in this event '
                 f'<select class="market-select" aria-label="Select a market">{options}</select></label></div>'
@@ -277,12 +288,12 @@ def write_dashboard(conn, n_markets, path=DASHBOARD_PATH, limit=300):
         <div class="card {group["severity"].lower()}" data-sev="{group["severity"]}">
           <div class="head"><span class="badge">{group["severity"]}</span>
             {market_link}
-            <span class="muted">{html.escape(group["field"])} · {group["similarity"]:.0%} similar · {html.escape(group["reason"])} · {group["ts"]}</span></div>
+            <span class="muted change-meta">{html.escape(group["field"])} · {first_market["similarity"]:.0%} similar · {html.escape(first_market["reason"])} · {group["ts"]}</span></div>
           {market_picker}
           <div class="title">{html.escape(first_market["title"] or "")}</div>
           <div class="compare">
-            <div class="side before"><div class="label">Previous rule</div>{before}</div>
-            <div class="side after"><div class="label">New rule</div>{after}</div>
+            <div class="side before"><div class="label">Previous rule</div><div class="rule-text">{before}</div></div>
+            <div class="side after"><div class="label">New rule</div><div class="rule-text">{after}</div></div>
           </div>
         </div>""")
 
@@ -317,8 +328,11 @@ document.querySelectorAll(".market-select").forEach(select => {{
     const option = select.selectedOptions[0];
     const card = select.closest(".card");
     card.querySelector(".title").textContent = option.dataset.title;
-    const link = card.querySelector(".market-link");
-    link.textContent = option.dataset.ticker;
+    card.querySelector(".market-link").textContent = option.dataset.ticker;
+    card.querySelector(".change-meta").textContent =
+      `${{option.dataset.field}} · ${{option.dataset.similarity}} similar · ${{option.dataset.reason}} · ${{option.dataset.timestamp}}`;
+    card.querySelector(".before .rule-text").innerHTML = option.dataset.before;
+    card.querySelector(".after .rule-text").innerHTML = option.dataset.after;
   }});
 }});
 </script>
